@@ -11,6 +11,7 @@ Changes:
 
 Todo:
  - Rename to `evil-god`
+ - Cleanup features
  - Simplify interface - use `evil-god-execute` and use `C-g` to abort.
  - Write comparisson to evil-god-state, evil-leader, god-mode, hydra, etc.
  - Remove pause functionality
