@@ -82,16 +82,21 @@ All predicates must return nil for god-local-mode to start."
     (let ((i ?\s))
       (while (< i 256)
         (define-key map (vector i) 'god-mode-self-insert)
-        (setq i (1+ i)))
-      (define-key map (kbd "DEL") nil))
+        (setq i (1+ i))))
+    (define-key map (kbd "DEL") nil)
+    (define-key map (kbd "C-g") 'god-local-mode)
     map))
+
+(evil-make-intercept-map god-local-mode-map)
 
 ;;;###autoload
 (define-minor-mode god-local-mode
   "Minor mode for running commands."
   nil " God" god-local-mode-map
   (if god-local-mode
-      (run-hooks 'god-mode-enabled-hook)
+      (progn
+        (evil-normalize-keymaps)
+        (run-hooks 'god-mode-enabled-hook))
     (run-hooks 'god-mode-disabled-hook)))
 
 (defun god-local-mode-pause ()
@@ -162,6 +167,7 @@ enabled. See also `god-local-mode-resume'."
     ;; `last-repeatable-command', which is used by `repeat'.
     (setq real-this-command binding)
     (setq god-literal-sequence nil)
+    (call-interactively 'god-local-mode)
     (if (commandp binding t)
         (call-interactively binding)
       (execute-kbd-macro binding))))

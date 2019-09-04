@@ -1,3 +1,22 @@
+# Evil God Mode
+
+This is a fork of the (archived/abandoned) god-mode optimized for evil-mode.
+
+While god-mode was inteded for normal (non-evil) emacs users to have some modal
+editing features, it provides an interface to all keybindings without using the
+control-key within evil.
+
+Changes:
+ - Make keybindings work in evil-mode (override evil keybindings)
+
+Todo:
+ - Rename to `evil-god`
+ - Simplify interface - use `evil-god-execute` and use `C-g` to abort.
+ - Write comparisson to evil-god-state, evil-leader, god-mode, hydra, etc.
+ - Remove pause functionality
+
+# The following is the original README.
+
 # God Mode — no more RSI
 
 ***NOTE***: Emacs 24.3 is required for this package to work well!
