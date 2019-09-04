@@ -112,11 +112,12 @@
     ;; `last-repeatable-command', which is used by `repeat'.
     (setq real-this-command binding)
     (setq god-literal-sequence nil)
-    (call-interactively 'god-local-mode)
     (if (commandp binding t)
-        (call-interactively binding)
+        (progn
+         (unless (eq binding 'digit-argument)
+           (call-interactively 'god-local-mode))
+         (call-interactively binding))
       (execute-kbd-macro binding))))
-
 (defun god-mode-upper-p (char)
   "Is the given char upper case?"
   (and (>= char ?A)
