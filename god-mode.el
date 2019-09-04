@@ -35,11 +35,6 @@
 
 (require 'cl-lib)
 
-(add-hook 'after-change-major-mode-hook 'god-mode-maybe-activate)
-
-(defvar god-local-mode-paused nil)
-(make-variable-buffer-local 'god-local-mode-paused)
-
 (defcustom god-mod-alist
   '((nil . "C-")
     ("g" . "M-")
@@ -53,27 +48,6 @@
   "The key used for literal interpretation."
   :group 'god
   :type 'string)
-
-(defcustom god-exempt-major-modes
-  '(dired-mode
-    grep-mode
-    vc-annotate-mode
-    git-commit-mode  ; For versions prior to Magit 2.1.0
-    magit-popup-mode)
-  "List of major modes that should not start in god-local-mode."
-  :group 'god
-  :type '(function))
-
-(defcustom god-exempt-predicates
-  (list #'god-exempt-mode-p
-        #'god-comint-mode-p
-        #'god-git-commit-mode-p
-        #'god-view-mode-p
-        #'god-special-mode-p)
-  "List of predicates checked before enabling god-local-mode.
-All predicates must return nil for god-local-mode to start."
-  :group 'god
-  :type '(repeat function))
 
 (defvar god-local-mode-map
   (let ((map (make-sparse-keymap)))
@@ -99,23 +73,6 @@ All predicates must return nil for god-local-mode to start."
         (run-hooks 'god-mode-enabled-hook))
     (run-hooks 'god-mode-disabled-hook)))
 
-(defun god-local-mode-pause ()
-  "Pause god-mode local to the buffer, if it's
-enabled. See also `god-local-mode-resume'."
-  (when god-local-mode
-    (god-local-mode -1)
-    (setq god-local-mode-paused t)))
-
-(defun god-local-mode-resume ()
-  "Will re-enable god-mode, if it was active when
-`god-local-mode-pause' was called. If not, nothing happens."
-  (when (bound-and-true-p god-local-mode-paused)
-    (setq god-local-mode-paused nil)
-    (god-local-mode 1)))
-
-(defvar god-global-mode nil
-  "Activate God mode on all buffers?")
-
 (defvar god-literal-sequence nil
   "Activated after space is pressed in a command sequence.")
 
@@ -127,18 +84,6 @@ enabled. See also `god-local-mode-resume'."
   (if god-global-mode
       (god-local-mode 1)
     (god-local-mode -1)))
-
-;;;###autoload
-(defun god-mode-all ()
-  "Toggle God mode in all buffers."
-  (interactive)
-  (let ((new-status (if (bound-and-true-p god-local-mode) -1 1)))
-    (setq god-global-mode t)
-    (mapc (lambda (buffer)
-            (with-current-buffer buffer
-              (god-mode-activate new-status)))
-          (buffer-list))
-    (setq god-global-mode (= new-status 1))))
 
 (defun god-mode-maybe-universal-argument-more ()
   "If god mode is enabled, call `universal-argument-more'."
@@ -251,64 +196,6 @@ call it."
            (god-mode-lookup-key-sequence nil key-string))
           (:else
            (error "God: Unknown key binding for `%s`" key-string)))))
-
-;;;###autoload
-(defun god-mode-maybe-activate (&optional status)
-  "Activate God mode locally on individual buffers when appropriate."
-  (when (not (minibufferp))
-    (god-mode-activate status)))
-
-(defun god-mode-activate (&optional status)
-  "Activate God mode locally on individual buffers when appropriate."
-  (when (and god-global-mode
-             (god-passes-predicates-p))
-    (god-local-mode (if status status 1))))
-
-(defun god-exempt-mode-p ()
-  "Return non-nil if major-mode is exempt.
-Members of the `god-exempt-major-modes' list are exempt."
-  (memq major-mode god-exempt-major-modes))
-
-(defun god-mode-child-of-p (major-mode parent-mode)
-  "Return non-nil if MAJOR-MODE is derived from PARENT-MODE."
-  (let ((parent (get major-mode 'derived-mode-parent)))
-    (cond ((eq parent parent-mode))
-          ((not (null parent))
-           (god-mode-child-of-p parent parent-mode))
-          (t nil))))
-
-(defun god-comint-mode-p ()
-  "Return non-nil if major-mode is child of comint-mode."
-  (god-mode-child-of-p major-mode 'comint-mode))
-
-(defun god-special-mode-p ()
-  "Return non-nil if major-mode is special or a child of special-mode."
-  (eq (get major-mode 'mode-class) 'special))
-
-(defun god-view-mode-p ()
-  "Return non-nil if view-mode is enabled in current buffer."
-  view-mode)
-
-(defun god-git-commit-mode-p ()
-  "Return non-nil if a `git-commit-mode' will be enabled in this buffer."
-  (and (bound-and-true-p global-git-commit-mode)
-       ;; `git-commit-filename-regexp' defined in the same library as
-       ;; `global-git-commit-mode'.  Expression above maybe evaluated
-       ;; to true because of autoload cookie.  So we perform
-       ;; additional check.
-       (boundp 'git-commit-filename-regexp)
-       buffer-file-name
-       (string-match-p git-commit-filename-regexp buffer-file-name)))
-
-(defun god-passes-predicates-p ()
-  "Return non-nil if all `god-exempt-predicates' return nil."
-  (not
-   (catch 'disable
-     (let ((preds god-exempt-predicates))
-       (while preds
-         (when (funcall (car preds))
-           (throw 'disable t))
-         (setq preds (cdr preds)))))))
 
 (provide 'god-mode)
 

@@ -8,13 +8,12 @@ control-key within evil.
 
 Changes:
  - Make keybindings work in evil-mode (override evil keybindings)
+ - Remove unneeded functionality (pause/resume, global-mode, activaters)
 
 Todo:
  - Rename to `evil-god`
- - Cleanup features
  - Simplify interface - use `evil-god-execute` and use `C-g` to abort.
  - Write comparisson to evil-god-state, evil-leader, god-mode, hydra, etc.
- - Remove pause functionality
 
 # The following is the original README.
 
