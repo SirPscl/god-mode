@@ -33,21 +33,32 @@
 
 ;;; Code:
 
-(require 'cl-lib)
 
-(defcustom god-mod-alist
-  '((nil . "C-")
-    ("g" . "M-")
-    ("G" . "C-M-"))
-  "List of keys and their associated modifer."
-  :group 'god
-  :type '(alist))
+; TODO: check if we need cl-lib?
+(require 'cl-lib)
 
 (defcustom god-literal-key
   "SPC"
   "The key used for literal interpretation."
   :group 'god
   :type 'string)
+
+(defcustom god-meta-key
+  "g"
+  "The key used for meta interpretation (M-)."
+  :group 'god
+  :type 'string)
+
+(defcustom god-control-meta-key
+  "G"
+  "The key used for control-meta interpretation (C-M-)."
+  :group 'god
+  :type 'string)
+
+(defun god-modifier-key-p (key)
+  (or (string= key god-literal-key)
+      (string= key god-meta-key)
+      (string= key god-control-meta-key)))
 
 (defvar god-local-mode-map
   (let ((map (make-sparse-keymap)))
@@ -73,17 +84,7 @@
         (run-hooks 'god-mode-enabled-hook))
     (run-hooks 'god-mode-disabled-hook)))
 
-(defvar god-literal-sequence nil
-  "Activated after space is pressed in a command sequence.")
-
-;;;###autoload
-(defun god-mode ()
-  "Toggle global God mode."
-  (interactive)
-  (setq god-global-mode (not god-global-mode))
-  (if god-global-mode
-      (god-local-mode 1)
-    (god-local-mode -1)))
+(add-hook 'god-local-mode-hook #'(lambda () (message "Goddess Mode")))
 
 (defun god-mode-maybe-universal-argument-more ()
   "If god mode is enabled, call `universal-argument-more'."
@@ -98,12 +99,25 @@
 (define-key universal-argument-map (kbd "u")
   #'god-mode-maybe-universal-argument-more)
 
+;; (defun god-execute ()
+;;   "Start god-mode without mode and keymap"
+;;   (interactive)
+;;   (setq binding (god-mode-lookup-command))
+;;   (if (commandp binding t)
+;;       (progn
+;;         (unless (eq binding 'digit-awhenrgument)
+;;           (call-interactively 'god-local-mode))
+;;         (call-interactively binding))
+;;     (execute-kbd-macro binding)))
+
 (defun god-mode-self-insert ()
   "Handle self-insert keys."
   (interactive)
+  ;; (message "self-insert")
   (let* ((initial-key (aref (this-command-keys-vector)
                             (- (length (this-command-keys-vector)) 1)))
          (binding (god-mode-lookup-key-sequence initial-key)))
+
     (when (god-mode-upper-p initial-key)
       (setq this-command-keys-shift-translated t))
     (setq this-original-command binding)
@@ -111,18 +125,27 @@
     ;; `real-this-command' is used by emacs to populate
     ;; `last-repeatable-command', which is used by `repeat'.
     (setq real-this-command binding)
-    (setq god-literal-sequence nil)
+    ;(setq god-literal-sequence nil)
+    ;; (message "executing: %s" binding)
     (if (commandp binding t)
         (progn
-         (unless (eq binding 'digit-argument)
-           (call-interactively 'god-local-mode))
-         (call-interactively binding))
+          (unless (eq binding 'digit-awhenrgument)
+            (call-interactively 'god-local-mode))
+          (call-interactively binding))
       (execute-kbd-macro binding))))
+
 (defun god-mode-upper-p (char)
   "Is the given char upper case?"
   (and (>= char ?A)
        (<= char ?Z)
        (/= char ?G)))
+
+(defun god-get-modifier-string (key)
+  "Returns the modifier string for event key."
+  (cond
+   ((string= key god-literal-key) "%s")
+   ((string= key god-meta-key) "M-%s")
+   ((string= key god-control-meta-key) "C-M-%s")))
 
 (defun god-mode-lookup-key-sequence (&optional key key-string-so-far)
   "Lookup the command for the given `key' (or the next keypress,
@@ -130,11 +153,48 @@ if `key' is nil). This function sometimes
 recurses. `key-string-so-far' should be nil for the first call in
 the sequence."
   (interactive)
-  (let ((sanitized-key
-         (god-mode-sanitized-key-string
-          (or key (read-event key-string-so-far)))))
-    (god-mode-lookup-command
-     (key-string-after-consuming-key sanitized-key key-string-so-far))))
+  ;; (message "------------------------")
+  (let* ((event (or key (read-event key-string-so-far)))
+         (sanitized-key (god-mode-sanitized-key-string event))
+         next-binding)
+    ;; (message ">> sanitized-key:%s event:%s" sanitized-key event)
+    (cond
+
+     ;; C-h -> show help
+     ((string= sanitized-key (kbd "C-h"))
+      ;; (message ">> which-key help (%s, %s)" sanitized-key key-string-so-far)
+      (which-key-C-h-dispatch)
+      (setq next-binding key-string-so-far)
+      (setq key-string-so-far nil))
+
+     ;; ditch C-? bindings (after which-key dispatched)
+     ((<= event 26)
+      (setq next-binding key-string-so-far)
+      (setq key-string-so-far nil))
+
+     ;; SPC, g, G -> read another key and format with the correct modifier
+     ((god-modifier-key-p sanitized-key)
+      (let ((second-event (read-event key-string-so-far)))
+        ;; (message ">> special binding with second-event:%s" (char-to-string second-event))
+        (setq next-binding
+              (format (god-get-modifier-string sanitized-key)
+                      (god-mode-sanitized-key-string second-event)))))
+
+     ;; other -> C-<sanitzied-key> or C-S-<sanitized-key>
+     (t
+      ;; (message ">> default -> next-binding:%s sanitizied-key:%s" (format "C-%s" sanitized-key) sanitized-key)
+      (setq next-binding
+            ;; or this? (god-mode-get-default-modifier-string sanitized-key)
+            (format "C-%s" sanitized-key))))
+
+    ;; format new key-string and call next round of keys.
+    (if key-string-so-far
+        (progn
+          ;; (message ">> combined key-string  %s %s" key-string-so-far next-binding)
+          (god-mode-lookup-command (format "%s %s" key-string-so-far next-binding)))
+      ;; (message ">> first binding: %s" nil next-binding)
+      (god-mode-lookup-command next-binding))
+    ))
 
 (defun god-mode-sanitized-key-string (key)
   "Convert any special events to textual."
@@ -151,40 +211,6 @@ the sequence."
     (return "RET")
     (t (char-to-string key))))
 
-(defun key-string-after-consuming-key (key key-string-so-far)
-  "Interpret god-mode special keys for key (consumes more keys if
-appropriate). Append to keysequence."
-  (let ((key-consumed t) (next-modifier "") next-key)
-    (message key-string-so-far)
-    (cond
-     ;; Don't check for god-literal-key with the first key
-     ((and key-string-so-far (string= key god-literal-key))
-      (setq god-literal-sequence t))
-     (god-literal-sequence
-      (setq key-consumed nil))
-     ((and (stringp key) (assoc key god-mod-alist))
-      (setq next-modifier (cdr (assoc key god-mod-alist))))
-     (t
-      (setq key-consumed nil
-            next-modifier (cdr (assoc nil god-mod-alist)))))
-    (setq next-key
-          (if key-consumed
-              (god-mode-sanitized-key-string (read-event key-string-so-far))
-            key))
-    (when (and (= (length next-key) 1)
-               (string= (get-char-code-property (aref next-key 0) 'general-category) "Lu")
-               ;; If C- is part of the modifier, S- needs to be given
-               ;; in order to distinguish the uppercase from the
-               ;; lowercase bindings. If C- is not in the modifier,
-               ;; then emacs natively treats uppercase differently
-               ;; from lowercase, and the S- modifier should not be
-               ;; given
-               (string-prefix-p "C-" next-modifier))
-      (setq next-modifier (concat next-modifier "S-")))
-    (if key-string-so-far
-        (concat key-string-so-far " " next-modifier next-key)
-      (concat next-modifier next-key))))
-
 (defun god-mode-lookup-command (key-string)
   "Execute extended keymaps such as C-c, or if it is a command,
 call it."
@@ -199,5 +225,81 @@ call it."
            (error "God: Unknown key binding for `%s`" key-string)))))
 
 (provide 'god-mode)
+
+
+    ;; (when (and (= (length next-key) 1)
+    ;;            (string= (get-char-code-property (aref next-key 0) 'general-category) "Lu")
+    ;;            ;; If C- is part of the modifier, S- needs to be given
+    ;;            ;; in order to distinguish the uppercase from the
+    ;;            ;; lowercase bindings. If C- is not in the modifier,
+    ;;            ;; then emacs natively treats uppercase differently
+    ;;            ;; from lowercase, and the S- modifier should not be
+    ;;            ;; given
+    ;;            (string-prefix-p "C-" next-modifier))
+    ;;   (setq next-modifier (concat next-modifier "S-")))
+
+;; (defun god-mode-get-default-modifier-string (key)
+;;   "Returns the modifier string for default event"
+;;   (if (and (= (length key) 1)
+;;            (string= (get-char-code-property (aref key 0) 'general-category) "Lu"))
+;;       "C-S-%s" ; is that right?
+;;     "C-%s"))
+
+
+;; (defun key-string-after-consuming-key (key key-string-so-far)
+;;   "Interpret god-mode special keys for key (consumes more keys if
+;; appropriate). Append to keysequence."
+;;   (let ((key-consumed t) (next-modifier "") next-key)
+;;     (cond
+;;      ;; Don't check for god-literal-key with the first key
+;;      ((and key-string-so-far (string= key god-literal-key))
+;;       ;; SPC -> next is key without god-mod-alist
+;;       (message ">> case literal sequence")
+;;       (setq god-literal-sequence t))
+;;      (god-literal-sequence
+;;       ;; not god-literate-alist -> no key consumed
+;;       (message ">> case no literal sequence")
+;;       (setq key-consumed nil))
+;;      ((and (stringp key) (assoc key god-mod-alist))
+;;       ;; with god-literate-alist -> get appropriate modifier
+;;       (setq next-modifier (cdr (assoc key god-mod-alist)))
+;;       (message ">> case next is modifier (%s)" next-modifier))
+;;      (t
+;;       ;; ???
+;;       (message ">> case C- (key:%s)" key)
+;;       (setq key-consumed nil
+;;             next-modifier (cdr (assoc nil god-mod-alist)))))
+;;     (setq next-key
+;;           (if key-consumed
+;;               (god-mode-sanitized-key-string (read-event key-string-so-far))
+;;             key))
+;;     (message ">> next-key:%s, next-modifier:%s" next-key next-modifier)
+;;     (when (and (= (length next-key) 1)
+;;                (string= (get-char-code-property (aref next-key 0) 'general-category) "Lu")
+;;                ;; If C- is part of the modifier, S- needs to be given
+;;                ;; in order to distinguish the uppercase from the
+;;                ;; lowercase bindings. If C- is not in the modifier,
+;;                ;; then emacs natively treats uppercase differently
+;;                ;; from lowercase, and the S- modifier should not be
+;;                ;; given
+;;                (string-prefix-p "C-" next-modifier))
+;;       (setq next-modifier (concat next-modifier "S-")))
+;;     (if key-string-so-far
+;;         (concat key-string-so-far " " next-modifier next-key)
+;;       (concat next-modifier next-key))))
+
+;; (defvar god-literal-sequence nil
+;;   "Activated after space is pressed in a command sequence.")
+
+;; ;;;###autoload
+;; (defun god-mode ()
+;;   "Toggle global God mode."
+;;   (interactive)
+;;   (setq god-global-mode (not god-global-mode))
+;;   (if god-global-mode
+;;       (god-local-mode 1)
+;;     (god-local-mode -1)))
+
+
 
 ;;; god-mode.el ends here

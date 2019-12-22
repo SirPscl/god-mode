@@ -1,100 +1,39 @@
 # Evil God Mode
 
-This is a fork of the (archived/abandoned) god-mode optimized for evil-mode.
+This is a fork of the (archived) god-mode inteded to work with evil-mode.
 
-While god-mode was inteded for normal (non-evil) emacs users to have some modal
-editing features, it provides an interface to all keybindings without using the
-control-key within evil.
-
-Changes:
- - Make keybindings work in evil-mode (override evil keybindings)
+Differences:
+ - Fix Keybindings for Evil Mode
  - Remove unneeded functionality (pause/resume, global-mode, activaters)
 
-Todo:
- - Rename to `evil-god`
- - Simplify interface - use `evil-god-execute` and use `C-g` to abort.
- - Write comparisson to evil-god-state, evil-leader, god-mode, hydra, etc.
+Things to do or analyse:
+ - Fix `which-key` commands (e.g. paging)
+ - Simplify interface - make `evil-god-execute` the sole function to call.
+ - Handle command repeat (with evil-repeat?)
+ - Universal argument (is it needed?)
+ - Rename project and definitions to `evil-god-...` without losing `which-key`
+   support (possible?)
 
-# The following is the original README.
+## Comparisson to other packages
 
-# God Mode — no more RSI
+### Evil God State
 
-***NOTE***: Emacs 24.3 is required for this package to work well!
+Evil God State aims to do the same thing as Evil God Mode. I used it for quite
+some time and am forever grateful. The difference lies in its implementation.
+Adding a new evil state for god-mode introduces new problems like handling calls
+from evil-visual-state (which does not work well with evil-god-state). In
+addition, some functionality of (the archived/abandoned) god-mode are not used
+and don't make sense for Evil God State. For those reasons I decided to fork
+god-mode and make Evil God Mode.
 
-This is a global minor mode for entering Emacs commands without
-modifier keys. It's similar to Vim's separation of commands and
-insertion mode.
+### Evil Leader
 
-## Example
+Evil Leader allows to bind functions under a variable prefix key. Evil God Mode
+allows to conveniently access all functions (with a keybinding). For example you
+could define `flycheck-list-errors (C-c ! l)` to be called via `<leader> e` with
+Evil-Leader. In Evil God Mode you can call it with `<leader>xf` (without having to.
 
-In the example below you can see how much effort is reduced:
-
-    Before: C-p C-k C-n M-^ ) C-j C-y M-r C-x z z M-2 M-g M-g C-x C-s
-    After:    p   k   n g ^ )   j   y g r     . .   2   g   g   x   s
-
-(Regarding `.` see
-[nice keybindings](https://github.com/chrisdone/god-mode#nice-keybindings)
-section.)
-
-You'll find that this mode comes surprisingly naturally and that you
-already know how to run your existing Emacs commands.
-
-See the Mapping section for a complete rundown of the transformations.
-
-## Activation
-
-Load it up:
-
-``` lisp
-(require 'god-mode)
-```
-
-Activate for all future buffers by running `M-x god-mode`. Although the
-activation is buffer-local.
-
-Toggle between God mode and non-God mode using `ESC`:
-
-``` lisp
-(global-set-key (kbd "<escape>") 'god-local-mode)
-```
-
-If you want to enable/disable on *all active and future buffers*, use
-this:
-
-``` lisp
-(global-set-key (kbd "<escape>") 'god-mode-all)
-```
-
-If you are using the global mode, you might want to make no buffers
-exempt:
-
-``` lisp
-(setq god-exempt-major-modes nil)
-(setq god-exempt-predicates nil)
-```
-
-This means that e.g. magit-mode or dired-mode will also enter god-mode
-when you activate it globally, and vise-verse. It means you can always
-reliably use god-mode commands in any buffer as long as it is globally
-activated.
-
-Also, you can add this to your `.xmodmap` to rebind Caps Lock to
-Escape:
-
-``` lisp
-remove Lock = Caps_Lock
-keysym Caps_Lock = Escape
-```
-
-And run `xmodmap .xmodmap` for the changes to take effect immediately.
-
-Or use dconf:
-
-    dconf write /org/gnome/desktop/input-sources/xkb-options "['caps:escape']"
-
-See [here](http://askubuntu.com/questions/363346/how-to-permanently-switch-caps-lock-and-esc) for more details.
-
-## Mapping
+## Usage
 
 This library defines the following mapping:
 
@@ -122,15 +61,7 @@ This library defines the following mapping:
 
 * Digit arguments:
 
-  * `12f` → `M-12 C-f`
-
-* Repetition (with `.` keybinding):
-
-  * `gf..` → `M-f M-f M-f`
-
-* Universal boolean argument:
-
-  * `uco` → `C-u C-c C-o`
+  * `12f` → `C-u 12 C-f`
 
 ## Cursor style to indicate mode
 
